@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real Chat Application Interface</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+</head>
+<body>
+<div class="container mt-4">
+    <h1 class="text-center">Real Chat Application Interface</h1>
+    <div id="chat" class="border rounded p-3 mb-3" style="height:300px; overflow-y:auto;">
+        <!-- Chat messages will appear here -->
+    </div>
+    <div class="input-group mb-3">
+        <input id="sender-input" type="text" class="form-control" placeholder="Type your name..." aria-label="Recipient's username" aria-describedby="button-send">
+    </div>
+    <div class="input-group mb-3">
+        <input id="messageInput" type="text" class="form-control" placeholder="Type your message..." aria-label="Recipient's username" aria-describedby="button-send">
+        <div id="input-group-append">
+            <button id="sendMessage" type="button" class="btn btn-primary">Send</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    var stompClient = null;
+
+    // Set connected/disconnected states for UI
+    function setConnected(connected) {
+        document.getElementById('sendMessage').disabled = !connected;
+        if (connected) {
+            console.log("Connected to WebSocket");
+        } else {
+            console.log("Disconnected from WebSocket");
+        }
+    }
+
+    // Connect to the WebSocket server
+    function connect() {
+        var socket = new SockJS('/chat'); // Make sure '/chat' is the correct WebSocket endpoint
+        stompClient = Stomp.over(socket);
+
+        stompClient.connect({}, function (frame) {
+            console.log('Connected: ' + frame); // Debugging connection success
+            setConnected(true);
+
+            // Subscribe to the topic '/topic/message'
+            stompClient.subscribe('/topic/message', function (message) {
+                console.log('Message received:', message.body); // Debugging message reception
+                try {
+                    var parsedMessage = JSON.parse(message.body); // Parse the message
+                    showMessage(parsedMessage);
+                } catch (e) {
+                    console.error("Error parsing message: ", e);
+                }
+            });
+        }, function (error) {
+            console.error('STOMP connection error:', error); // Log connection errors
+        });
+    }
+
+    // Display messages in the chat window
+    function showMessage(message) {
+        console.log('Displaying message:', message); // Debugging message content
+        if (message && message.sender && message.content) {
+            var chat = document.getElementById('chat');
+            var messageElement = document.createElement('div');
+            messageElement.textContent = message.sender + ': ' + message.content;
+            messageElement.class = "border-bottom mb-1"; // Fixed class name assignment
+            chat.appendChild(messageElement);
+            chat.scrollTop = chat.scrollHeight; // Scroll to the bottom of the chat
+        } else {
+            console.warn("Invalid message format:", message);
+        }
+    }
+
+    // Send a message
+    function sendMessage() {
+        var sender = document.getElementById('sender-input').value;  // Corrected input ID reference
+        var content = document.getElementById('messageInput').value;
+
+        if (sender && content) {
+            var chatMessage = {
+                sender: sender,
+                content: content
+            };
+            console.log('Sending message:', chatMessage); // Debugging message before sending
+            stompClient.send("/app/sendMessage", {}, JSON.stringify(chatMessage)); // Corrected typo
+            document.getElementById('messageInput').value = ''; // Clear the input field
+        } else {
+            console.warn("Sender name or message content is missing.");
+        }
+    }
+
+    // Attach event listeners
+    document.getElementById('sendMessage').onclick = sendMessage;
+
+    // Initialize connection on page load
+    window.onload = connect;
+</script>
+</body>
+</html>
